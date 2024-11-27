@@ -1,0 +1,74 @@
+## Membuat temporary table untuk laporan penjualan bulanan per produk
+CREATE TEMPORARY TABLE report_monthly_orders_product_agg AS
+SELECT 
+    EXTRACT(YEAR FROM o.created_at) AS year, 
+    EXTRACT(MONTH FROM o.created_at) AS month,
+    p.id,
+    p.name,
+    SUM(o.num_of_item) AS total_quantity_sold,
+    SUM(o.num_of_item * oi.sale_price) AS total_price
+FROM 
+    bigquery-public-data.thelook_ecommerce.orders o
+JOIN 
+    bigquery-public-data.thelook_ecommerce.order_items oi
+ON 
+    o.order_id = oi.order_id
+JOIN 
+    bigquery-public-data.thelook_ecommerce.products p
+ON 
+    oi.product_id = p.id
+GROUP BY 
+    year, month, p.id, p.name;
+
+## Mengambil data produk dengan penjualan tertinggi setiap bulannya
+SELECT 
+    year, 
+    month, 
+    id, 
+    name, 
+    total_quantity_sold, 
+    total_price
+FROM (
+    SELECT 
+        *,
+        ROW_NUMBER() OVER (PARTITION BY year, month ORDER BY total_quantity_sold DESC) AS rank
+    FROM 
+        report_monthly_orders_product_agg
+)
+WHERE rank = 1
+ORDER BY year ASC, month ASC;
+
+
+Penjelasan:
+
+CREATE TEMPORARY TABLE: Query ini untuk membuat tabel sementara bernama "report_monthly_orders_product_agg". Tabel ini juga hanya tersedia selama sesi ini aktif.
+AS: Query ini untuk menentukan bahwa isi tabel sementara akan dihasilkan oleh query berikutnya.
+
+SELECT: Query ini untuk memilih semua kolom dari tabel yang akan ditentukan.
+EXTRACT(YEAR FROM o.created_at) AS year: Query ini untuk mengambil tahun dari kolom "created_at" di tabel "orders" yang kemudian disimpan ke dalam kolom baru "year".
+EXTRACT(MONTH FROM o.created_at) AS month: Query ini untuk mengambil bulan dari kolom "created_at" di tabel "orders" yang kemudian disimpan ke dalam kolom baru "month".
+p.id: Query ini untuk mengambil id produk dari tabel "products".
+p.name: Query ini untuk mengambil nama produk dari tabel "products".
+SUM(o.num_of_item) AS total_quantity_sold: Query ini untuk menghitung total produk terjual (num_of_item) dari tabel "orders" yang kemudian disimpan ke dalam kolom baru "total_quantity_sold".
+SUM(o.num_of_item * oi.sale_price) AS total_price: Query ini untuk menghitung total pendapatan penjualan yang diperoleh hasil dari perkalian kolom "num_of_item" dari tabel "orders" dengan kolom "sale_price" dari tabel "order_items" yang kemudian disimpan ke dalam kolom baru "total_price".
+
+FROM bigquery-public-data.thelook_ecommerce.orders o: Query ini untuk mengakses data (FROM) dari tabel "orders" yang berada dalam dataset "thelook_ecommerce" yang merupakan bagian dari bigquery-public-data yang kemudian disimpan ke dalam variabel baru "o" untuk mempermudah penulisan.
+JOIN bigquery-public-data.thelook_ecommerce.order_items oi: Query ini untuk menggabungkan (JOIN) dengan tabel "order_items" yang sebelumnya tabel ini disimpan ke dalam variabel baru "oi".
+ON o.order_id = oi.order_id: Query ini untuk menghubungkan (ON) tabel "o" dan "oi" berdasarkan kolom "order_id" dari tabel "o" dan kolom "order_id" dari tabel "oi".
+JOIN bigquery-public-data.thelook_ecommerce.products p: Query ini untuk menggabungkan (JOIN) dengan tabel "products" yang sebelumnya tabel ini disimpan ke dalam variabel baru "p".
+ON oi.product_id = p.id: Query ini untuk menghubungkan (ON) tabel "oi" dan "p" berdasarkan kolom "product_id" dari tabel "oi" dan kolom "id" dari tabel "p".
+GROUP BY year, month, p.id, p.name: Query ini untuk mengelompokkan data berdasarkan tahun (year), bulan (month), id produk dari tabel "p" (p.id), dan nama produk dari kolom "p" (p.name).
+
+SELECT year, month, id, name, total_quantity_sold, total_price: Query ini untuk memilih kolom tahun (year), bulan (month), id produk (id), nama produk (name), total produk terjual (total_quantity_sold), dan total pendapatan penjualan (total_price).
+
+FROM: Query ini untuk mengakses data yang akan dihasilkan query berikutnya.
+SELECT *: Query ini untuk memilih semua data (*).
+ROW_NUMBER(): Query ini untuk memberikan nomor urut yang dimulai dari 1.
+OVER: Query ini untuk menentukan cara menghitung nilai setiap baris.
+PARTITION BY year, month: Query ini untuk membagi data ke dalam kelompok yang dihasilkan dari kombinasi tahun (yea) dan bulan (month).
+ORDER BY total_quantity_sold DESC: Query ini untuk mengurutkan "total_quantity_sold" secara menurun (DESC).
+AS rank: Query ini untuk menyimpan hasil dari query sebelumnya ke dalam variabel baru "rank".
+FROM report_monthly_orders_product_agg: Query ini untuk mengakses data (FROM) dari tabel "report_monthly_orders_product_agg".
+
+WHERE rank = 1: Query untuk mengambil baris pertama kolom "rank".
+ORDER BY year ASC, month ASC: Query ini untuk mengurutkan hasil dari tabel yang dipilih berdasarkan tahun (month) dan bulan (month) secara menaik (ASC).
